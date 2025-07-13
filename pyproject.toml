@@ -1,0 +1,20 @@
+[project]
+name = "learn-nn"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "argparse>=1.4.0",
+    "matplotlib>=3.10.3",
+    "mlflow>=3.1.1",
+    "pandas>=2.3.1",
+    "scikit-learn>=1.7.0",
+    "torch>=2.7.1",
+    "torchvision>=0.22.1",
+]
+
+[dependency-groups]
+dev = [
+    "ipython>=8.37.0",
+]
