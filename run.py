@@ -43,34 +43,33 @@ def fit_and_predict(n: int = 3,
         Xtest = torch.cat((Xtest, id), dim=1)
         dtrain.append((Xtrain, ytrain))
         dtest.append((Xtest, ytest))
-        Xtrain = torch.concat([ d[0] for d in dtrain ])
-        ytrain = torch.concat([ d[1] for d in dtrain ])
-        x_data = Variable(Xtrain)
-        y_data = Variable(ytrain)
-        x_test = torch.concat([ d[0] for d in dtest ])
-        y_test = torch.concat([ d[1] for d in dtest ])
-        model = fit(x_data, y_data, x_test, y_test, params)
-        ## predict and plot
-        model.eval()
-        yfitted = model(x_data).detach().numpy().flatten()
-        yfitted.shape
-        data.loc[(data["ds"] >= histlen) & (data["ds"] < cutoff), "yhat"] = yfitted
-        ypred   = model(x_test).detach().numpy().flatten()
-        data.loc[(data["ds"] >= cutoff), "yhat"] = ypred
-        fig, ax = plt.subplots()
-        x = data.ds.unique()
-        data.groupby("unique_id")["y"].apply(lambda y: ax.plot(x, (y.to_numpy() - y.mean()) / np.sqrt(y.var())))
-        #data.groupby("unique_id")["y"].apply( lambda y: ax.plot(x, y))
-        data.groupby("unique_id")["yhat"].apply(lambda y: ax.plot(x, y))
-        plt.savefig("a")
-        return None
+    Xtrain = torch.concat([ d[0] for d in dtrain ])
+    ytrain = torch.concat([ d[1] for d in dtrain ]).unsqueeze(1)
+    x_data = Variable(Xtrain)
+    y_data = Variable(ytrain)
+    x_test = torch.concat([ d[0] for d in dtest ])
+    y_test = torch.concat([ d[1] for d in dtest ]).unsqueeze(1)
+    model = fit(x_data, y_data, x_test, y_test, params)
+    ## predict and plot
+    model.eval()
+    yfitted = model(x_data).detach().numpy().flatten()
+    yfitted.shape
+    data.loc[(data["ds"] >= histlen) & (data["ds"] < cutoff), "yhat"] = yfitted
+    ypred   = model(x_test).detach().numpy().flatten()
+    data.loc[(data["ds"] >= cutoff), "yhat"] = ypred
+    fig, ax = plt.subplots()
+    x = data.ds.unique()
+    data.groupby("unique_id")["y"].apply(lambda y: ax.plot(x, (y.to_numpy() - y.mean()) / np.sqrt(y.var())))
+    #data.groupby("unique_id")["y"].apply( lambda y: ax.plot(x, y))
+    data.groupby("unique_id")["yhat"].apply(lambda y: ax.plot(x, y))
+    plt.savefig("a")
 
 
 def main():
 
-    params = {"n": 3, "histlen": 12, 
-              "n_epoch": 5 * 1000, 
-              "batch_size": 1,
+    params = {"n": 1, "histlen": 12, 
+              "n_epoch": 20 * 1000, 
+              "batch_size": 32,
               "lr": 1e-3}
     torch.manual_seed(123)
     with mlflow.start_run():

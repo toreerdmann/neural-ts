@@ -8,6 +8,7 @@ import random
 import mlflow
 
 import pandas as pd
+import numpy as np
 
 
 def split_sequence(sequence, n_steps):
@@ -22,7 +23,7 @@ def split_sequence(sequence, n_steps):
         seq_x, seq_y = sequence[i:end_ix], sequence[end_ix]
         X.append(seq_x)
         y.append(seq_y)
-    return torch.tensor(X), torch.tensor(y)
+    return torch.tensor(np.array(X)), torch.tensor(y)
 
 
 def f(ds, beta = torch.tensor([0., 0., 0., 0.]), sig = .01):
@@ -59,14 +60,20 @@ class MLP(nn.Module):
     def __init__(self, n_in: int = 2):
         super().__init__()
         self.layers = nn.Sequential(
-            nn.Linear(n_in, 32),
+            nn.Linear(n_in, 64),
             nn.ReLU(),
-            nn.Linear(32, 16),
+            nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(16, 1)
+            nn.Linear(32, 1)
         )
+        def init_weights(m):
+            if isinstance(m, nn.Linear):
+                #torch.nn.init.xavier_normal_(m.weight)
+                torch.nn.init.xavier_uniform_(m.weight)
+        self.layers.apply(init_weights)
     def forward(self, x):
         return self.layers(x)
+
 
 
 def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3, 
@@ -90,8 +97,8 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
         for batch_idx, batch in enumerate(train_dataloader):
             bx, by = batch
             pred_y = our_model(bx)
-            loss = criterion(pred_y, by)
             optimizer.zero_grad()
+            loss = criterion(pred_y, by)
             loss.backward()
             ## clips if L2-norm of all gradients > 1.0
             #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5) 
@@ -103,7 +110,6 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
                     our_model(x_test).flatten(), 
                     torch.tensor(y_test)
                 ).tolist()
-                optimizer.zero_grad()
             print('epoch {}, loss {}, val loss {}'.format(
                 epoch, 
                 loss.item(),
