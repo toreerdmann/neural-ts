@@ -70,10 +70,48 @@ class MLP(nn.Module):
             if isinstance(m, nn.Linear):
                 #torch.nn.init.xavier_normal_(m.weight)
                 torch.nn.init.xavier_uniform_(m.weight)
-        self.layers.apply(init_weights)
+        # self.layers.apply(init_weights)
     def forward(self, x):
         return self.layers(x)
 
+
+def train_loop(dataloader, model, loss_fn, optimizer):
+    size = len(dataloader.dataset)
+    model.train()
+    for batch, (X, y) in enumerate(dataloader):
+        pred = model(X)
+        optimizer.zero_grad()
+        loss = loss_fn(pred, y)
+        optimizer.step()
+        #if batch % 100 == 0:
+        loss, current = loss.item(), batch * dataloader.batch_size + len(X)
+        # print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+def test_loop(dataloader, model, loss_fn):
+    model.eval()
+    size = len(dataloader.dataset)
+    num_batches = len(dataloader)
+    test_loss = 0
+    with torch.no_grad():
+        for X, y in dataloader:
+            pred = model(X)
+            test_loss += loss_fn(pred, y).item()
+    test_loss /= num_batches
+    # print(f"Avg loss: {test_loss:>8f} \n")
+    mlflow.log_metrics({
+        "test_loss": test_loss, 
+    })
+def train(train_dataloader, test_dataloader, params):
+    n_in = params["n_in"]
+    model = MLP(n_in)
+    loss_fn = torch.nn.MSELoss()
+    #optimizer = torch.optim.Adam(model.parameters(), lr = params["lr"])
+    optimizer = torch.optim.SGD(model.parameters(), lr = params["lr"])
+    for t in range(params["n_epoch"]):
+        # print(f"Epoch {t+1}\n-------------------------------")
+        train_loop(train_dataloader, model, loss_fn, optimizer)
+        if t % 100 == 0:
+            test_loop(test_dataloader, model, loss_fn)
+    return model
 
 
 def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3, 
@@ -81,11 +119,11 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
                                                             "n_epoch": 1000}):
     n_in = len(x_data[0])
     # our model
-    # our_model = LinearRegressionModel(n_in)
-    our_model = MLP(n_in)
+    # model = LinearRegressionModel(n_in)
+    model = MLP(n_in)
     criterion = torch.nn.MSELoss()
-    #optimizer = torch.optim.SGD(our_model.parameters(), lr = lr)
-    optimizer = torch.optim.Adam(our_model.parameters(), lr = params["lr"])
+    #optimizer = torch.optim.SGD(model.parameters(), lr = lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr = params["lr"])
     #optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
     training_data = [(x, y) 
         for x,y in zip(x_data, y_data)]
@@ -93,10 +131,10 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
                                   batch_size=params["batch_size"], 
                                   shuffle=True)
     # train_features, train_labels = next(iter(train_dataloader))
+    model.train()
     for epoch in range(params["n_epoch"]):
-        for batch_idx, batch in enumerate(train_dataloader):
-            bx, by = batch
-            pred_y = our_model(bx)
+        for batch_idx, (bx, by) in enumerate(train_dataloader):
+            pred_y = model(bx)
             optimizer.zero_grad()
             loss = criterion(pred_y, by)
             loss.backward()
@@ -107,7 +145,7 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
             val_loss = 0
             if x_test is not None:
                 val_loss = criterion(
-                    our_model(x_test).flatten(), 
+                    model(x_test).flatten(), 
                     torch.tensor(y_test)
                 ).tolist()
             print('epoch {}, loss {}, val loss {}'.format(
@@ -119,7 +157,7 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
                 "batch_loss": loss.item(), 
                 "val_loss": val_loss
             }, step=epoch * len(train_dataloader) + batch_idx)
-    return our_model
+    return model
 
 if __name__ == "main":
 

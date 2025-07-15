@@ -1,33 +1,30 @@
 import torch
 from torch.autograd import Variable
+from torch.utils.data import DataLoader
 import pandas as pd
 import matplotlib.pyplot as plt
 import mlflow
-from utils import fit, split_sequence, sim, f
+from utils import fit, split_sequence, sim, f, train
 import numpy as np
 
 mlflow.set_tracking_uri(uri="http://localhost:8080")
 
-
-def fit_and_predict(n: int = 3,
-                    histlen: int = 6,
-                    cutoff: int = 100,
-                    params = {}):
-    data = sim(n, 200) 
+def fit_and_predict(params = {}):
+    data = sim(params["n"], 200) 
     #y = data.loc[data["ds"] < 100, "y"].to_numpy()
     #data.y = torch.tensor(data.y.to_numpy())
     # normalize together?
     #data["y"] = (torch.tensor(data["y"].to_numpy()) - data["y"].mean()) / torch.sqrt(torch.tensor([data["y"].var()]))
     splits = data.groupby("unique_id")["y"].apply(
         #lambda y: split_sequence((torch.tensor(y.to_numpy()) - torch.tensor([y.mean()])) / torch.sqrt(torch.tensor([y.var()])), histlen)
-        lambda y: split_sequence((y.to_numpy() - y.mean()) / np.sqrt(y.var()), histlen)
+        lambda y: split_sequence((y.to_numpy() - y.mean()) / np.sqrt(y.var()), params["histlen"])
         #lambda y: split_sequence(y.to_numpy(), histlen)
     )
     # now do the split
     cutoff = 100
     dtrain = []
     dtest  = []
-    for i in range(n):
+    for i in range(params["n"]):
         X, y = splits[i]
         # normalize together?
         #X = (X - X.mean()) / torch.sqrt(X.var())
@@ -49,37 +46,55 @@ def fit_and_predict(n: int = 3,
     y_data = Variable(ytrain)
     x_test = torch.concat([ d[0] for d in dtest ])
     y_test = torch.concat([ d[1] for d in dtest ]).unsqueeze(1)
+    # train_dataloader = DataLoader([(x, y) for x,y in zip(x_data, y_data)],
+    #                               batch_size=params["batch_size"], 
+    #                               shuffle=True)
+    # test_dataloader = DataLoader([(x, y) for x,y in zip(x_test, y_test)])
+    # params["n_in"] = len(x_data[0])
+    # model = train(train_dataloader, test_dataloader, params)
     model = fit(x_data, y_data, x_test, y_test, params)
     ## predict and plot
-    model.eval()
     yfitted = model(x_data).detach().numpy().flatten()
     yfitted.shape
-    data.loc[(data["ds"] >= histlen) & (data["ds"] < cutoff), "yhat"] = yfitted
+    data.loc[(data["ds"] >= params["histlen"]) & (data["ds"] < cutoff), "yhat"] = yfitted
     ypred   = model(x_test).detach().numpy().flatten()
     data.loc[(data["ds"] >= cutoff), "yhat"] = ypred
-    fig, ax = plt.subplots()
+    make_plots(data)
+    # fig, ax = plt.subplots(nrows=3, ncols=3)
+    # x = data.ds.unique()
+    # data.groupby("unique_id")["y"].apply(lambda y: ax.plot(x, (y.to_numpy() - y.mean()) / np.sqrt(y.var())))
+    # #data.groupby("unique_id")["y"].apply( lambda y: ax.plot(x, y))
+    # data.groupby("unique_id")["yhat"].apply(lambda y: ax.plot(x, y))
+    # plt.savefig("a")
+
+def make_plots(data: pd.DataFrame):
     x = data.ds.unique()
-    data.groupby("unique_id")["y"].apply(lambda y: ax.plot(x, (y.to_numpy() - y.mean()) / np.sqrt(y.var())))
-    #data.groupby("unique_id")["y"].apply( lambda y: ax.plot(x, y))
-    data.groupby("unique_id")["yhat"].apply(lambda y: ax.plot(x, y))
-    plt.savefig("a")
+    ids = data.unique_id.unique()
+    for id in ids:
+        fig, ax = plt.subplots()
+        y = data.loc[data["unique_id"] == id]["y"]
+        yhat = data.loc[data["unique_id"] == id]["yhat"]
+        ax.plot(x, (y - y.mean()) / np.sqrt(y.var()))
+        ax.plot(x, (yhat - yhat.mean()) / np.sqrt(yhat.var()))
+        plt.savefig(f"figs/{id}.png")
 
 
 def main():
 
-    params = {"n": 1, "histlen": 12, 
-              "n_epoch": 20 * 1000, 
-              "batch_size": 32,
+    params = {"n": 10, 
+              "histlen": 12, 
+              "cutoff": 100,
+              "n_epoch": 50 * 1000, 
+              "batch_size": 64,
               "lr": 1e-3}
     torch.manual_seed(123)
     with mlflow.start_run():
         # Log the hyperparameters
         mlflow.log_params(params)
-        fit_and_predict(n=params["n"], histlen=params["histlen"], params=params)
+        fit_and_predict(params=params)
 
 
 if __name__ == "__main__":
 
-    print("Hi from run.py")
     main()
 
