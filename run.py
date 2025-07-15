@@ -7,6 +7,8 @@ import mlflow
 from utils import fit, split_sequence, sim, f, train
 import numpy as np
 
+device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
+
 mlflow.set_tracking_uri(uri="http://localhost:8080")
 
 def fit_and_predict(params = {}):
@@ -34,18 +36,18 @@ def fit_and_predict(params = {}):
         Xtest = X[-cutoff:]
         ytest = y[-cutoff:]
         ## add id column
-        id = torch.ones(len(Xtrain), 1) * i
+        id = torch.ones(len(Xtrain), 1).to(device) * i
         Xtrain = torch.cat((Xtrain, id), dim=1)
-        id = torch.ones(len(Xtest), 1) * i
+        id = torch.ones(len(Xtest), 1).to(device) * i
         Xtest = torch.cat((Xtest, id), dim=1)
         dtrain.append((Xtrain, ytrain))
         dtest.append((Xtest, ytest))
-    Xtrain = torch.concat([ d[0] for d in dtrain ])
-    ytrain = torch.concat([ d[1] for d in dtrain ]).unsqueeze(1)
+    Xtrain = torch.concat([ d[0] for d in dtrain ]).to(device)
+    ytrain = torch.concat([ d[1] for d in dtrain ]).to(device).unsqueeze(1)
     x_data = Variable(Xtrain)
     y_data = Variable(ytrain)
-    x_test = torch.concat([ d[0] for d in dtest ])
-    y_test = torch.concat([ d[1] for d in dtest ]).unsqueeze(1)
+    x_test = torch.concat([ d[0] for d in dtest ]).to(device)
+    y_test = torch.concat([ d[1] for d in dtest ]).to(device).unsqueeze(1)
     # train_dataloader = DataLoader([(x, y) for x,y in zip(x_data, y_data)],
     #                               batch_size=params["batch_size"], 
     #                               shuffle=True)
@@ -54,10 +56,10 @@ def fit_and_predict(params = {}):
     # model = train(train_dataloader, test_dataloader, params)
     model = fit(x_data, y_data, x_test, y_test, params)
     ## predict and plot
-    yfitted = model(x_data).detach().numpy().flatten()
+    yfitted = model(x_data).cpu().detach().numpy().flatten()
     yfitted.shape
     data.loc[(data["ds"] >= params["histlen"]) & (data["ds"] < cutoff), "yhat"] = yfitted
-    ypred   = model(x_test).detach().numpy().flatten()
+    ypred   = model(x_test).cpu().detach().numpy().flatten()
     data.loc[(data["ds"] >= cutoff), "yhat"] = ypred
     make_plots(data)
     # fig, ax = plt.subplots(nrows=3, ncols=3)
@@ -84,8 +86,8 @@ def main():
     params = {"n": 10, 
               "histlen": 12, 
               "cutoff": 100,
-              "n_epoch": 50 * 1000, 
-              "batch_size": 64,
+              "n_epoch": 10 * 1000, 
+              "batch_size": 128,
               "lr": 1e-3}
     torch.manual_seed(123)
     with mlflow.start_run():

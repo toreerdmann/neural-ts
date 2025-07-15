@@ -10,6 +10,7 @@ import mlflow
 import pandas as pd
 import numpy as np
 
+device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 
 def split_sequence(sequence, n_steps):
     X, y = list(), list()
@@ -23,7 +24,7 @@ def split_sequence(sequence, n_steps):
         seq_x, seq_y = sequence[i:end_ix], sequence[end_ix]
         X.append(seq_x)
         y.append(seq_y)
-    return torch.tensor(np.array(X)), torch.tensor(y)
+    return torch.tensor(np.array(X)).to(device), torch.tensor(y).to(device)
 
 
 def f(ds, beta = torch.tensor([0., 0., 0., 0.]), sig = .01):
@@ -62,15 +63,17 @@ class MLP(nn.Module):
         self.layers = nn.Sequential(
             nn.Linear(n_in, 64),
             nn.ReLU(),
-            nn.Linear(64, 32),
+            nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(32, 1)
-        )
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1)
+        ).to(device)
         def init_weights(m):
             if isinstance(m, nn.Linear):
                 #torch.nn.init.xavier_normal_(m.weight)
                 torch.nn.init.xavier_uniform_(m.weight)
-        # self.layers.apply(init_weights)
+        self.layers.apply(init_weights)
     def forward(self, x):
         return self.layers(x)
 
@@ -131,6 +134,11 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
                                   batch_size=params["batch_size"], 
                                   shuffle=True)
     # train_features, train_labels = next(iter(train_dataloader))
+    if device.type == 'cuda':
+        print(torch.cuda.get_device_name(0))
+        print('Memory Usage:')
+        print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,4), 'GB')
+        print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,4), 'GB')
     model.train()
     for epoch in range(params["n_epoch"]):
         for batch_idx, (bx, by) in enumerate(train_dataloader):
@@ -146,7 +154,8 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
             if x_test is not None:
                 val_loss = criterion(
                     model(x_test).flatten(), 
-                    torch.tensor(y_test)
+                    #torch.tensor(y_test)
+                    y_test,
                 ).tolist()
             print('epoch {}, loss {}, val loss {}'.format(
                 epoch, 
@@ -157,6 +166,7 @@ def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3,
                 "batch_loss": loss.item(), 
                 "val_loss": val_loss
             }, step=epoch * len(train_dataloader) + batch_idx)
+
     return model
 
 if __name__ == "main":
