@@ -8,17 +8,12 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-from model import MLP
-from data import TimeSeriesDataset, Standardize
+from itertools import chain
+
+from nts.model import MLP
+from nts.data import TimeSeriesDataset, Standardize
 from torch.utils.data import DataLoader
-
-
-data = TimeSeriesDataset(4, 200, transform=Standardize())
-
-data.data
-train, test = data[3]
-
-test.dataset
+from nts.config import Parameters
 
 def make_plots(data: pd.DataFrame):
     figs = "figs"
@@ -36,28 +31,34 @@ def make_plots(data: pd.DataFrame):
 
 
 
-def fit(train_dataloader: DataLoader, params, x_test=None, y_test=None):
-    n_in = len(train_dataloader.dataset[0][0])
+def train(data, params):
+
+    ## concat the samples
+    train_joined = list(chain(*[data[i][0] for i in range(data.n)]))
+    train_dataloader = DataLoader(
+        train_joined,
+        batch_size=params.batch_size, shuffle=True
+    )
+    ## get number of features
+    n_in = len(train_joined[0][0])
     model = MLP(n_in, params.device)
     criterion = torch.nn.MSELoss()
-    # optimizer = torch.optim.SGD(model.parameters(), lr = lr)
-    optimizer = torch.optim.Adam(model.parameters(), lr=params.lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr = params.lr)
     if params.device.type == "cuda":
         print(torch.cuda.get_device_name(0))
         print("Memory Usage:")
         print("Allocated:", round(torch.cuda.memory_allocated(0) / 1024**3, 4), "GB")
         print("Cached:   ", round(torch.cuda.memory_reserved(0) / 1024**3, 4), "GB")
-    model.train()
     for epoch in range(params.n_epoch):
+        model.train()
         for batch_idx, (bx, by) in enumerate(train_dataloader):
             pred_y = model(bx)
             optimizer.zero_grad()
             loss = criterion(pred_y, by)
             loss.backward()
-            ## clips if L2-norm of all gradients > 1.0
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
             optimizer.step()
         if epoch % 100 == 0:
+            model.eval()
             val_loss = 0
             if x_test is not None:
                 val_loss = criterion(
@@ -110,9 +111,12 @@ def preprocess(data, params):
 
 
 def fit_and_predict(params):
-    data = sim(params.n, 200)
-    train_dataloader, x_test, y_test = preprocess(data, params)
-    model = fit(train_dataloader, params, x_test, y_test)
+
+    data = TimeSeriesDataset(params.n, params.nT, transform=Standardize())
+    train, test = data[0]
+
+
+    model = train(train_dataloader, params, x_test, y_test)
     ## add fitted values
 
     yfit = model(torch.concat([x for x,y in train_dataloader]))

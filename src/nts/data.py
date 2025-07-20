@@ -45,7 +45,7 @@ class Standardize(object):
 class TimeSeriesDataset(Dataset):
     """Time series dataset"""
 
-    def __init__(self, n, nT, transform=None, n_steps:int = 20, cutoff: float = 0.5, batch_size: int = 32):
+    def __init__(self, n, nT, transform=None, n_steps:int = 20, cutoff: float = 0.5, batch_size: int = 32, device: torch.device = torch.device("cpu")):
         """
         Arguments:
             n  (int): Number of time series.
@@ -59,6 +59,7 @@ class TimeSeriesDataset(Dataset):
         self.n_steps = n_steps
         self.cutoff = cutoff
         self.batch_size = batch_size
+        self.device = device
 
     def __len__(self):
         return self.n
@@ -79,21 +80,15 @@ class TimeSeriesDataset(Dataset):
         ytest = y[ -int(self.cutoff * self.nT) :]
 
         # train samples (return like this so we can create the dataloader later)
-        train = DataLoader(
-            [(
-                ## add indicator for idx
-                torch.concat((torch.tensor(x), torch.tensor([idx]))), 
-                torch.tensor(y)
-            )
-                for x, y in zip(Xtrain, ytrain)],
-            batch_size=self.batch_size, shuffle=True
-        )
-        test = DataLoader(
-            [(
-                ## add indicator for idx
-                torch.concat((torch.tensor(x), torch.tensor([idx]))), 
-                torch.tensor(y)
-            )
-                for x, y in zip(Xtest, ytest)]
-        )
+        train = [(
+            ## add indicator for idx
+            torch.concat((torch.tensor(x), torch.tensor([idx]))).to(self.device), 
+            torch.tensor(y).to(self.device)
+        ) for x, y in zip(Xtrain, ytrain)]
+        test = [(
+            ## add indicator for idx
+            torch.concat((torch.tensor(x), torch.tensor([idx]))).to(self.device), 
+            torch.tensor(y).to(self.device)
+        ) for x, y in zip(Xtest, ytest)]
+    
         return train, test

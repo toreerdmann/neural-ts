@@ -1,4 +1,5 @@
 from torch import nn
+import torch
 
 
 class LinearRegressionModel(nn.Module):
@@ -13,7 +14,7 @@ class LinearRegressionModel(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, n_in, device):
+    def __init__(self, n_in, device = torch.device("cpu")):
         super().__init__()
         self.layers = nn.Sequential(
             nn.Linear(n_in, 64),

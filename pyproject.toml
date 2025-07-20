@@ -8,7 +8,6 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "argparse>=1.4.0",
     "matplotlib>=3.10.3",
     "mlflow>=3.1.1",
     "pandas>=2.3.1",
@@ -22,6 +21,9 @@ dependencies = [
 dev = [
     "ipython>=8.37.0",
 ]
+
+[tool.uv]
+package = true
 
 [tool.uv.workspace]
 members = [
