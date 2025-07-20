@@ -1,7 +1,7 @@
-
 import torch
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Parameters(BaseSettings):
     model_config = SettingsConfigDict()
@@ -21,4 +21,3 @@ class Parameters(BaseSettings):
             return torch.device("cuda") if torch.cuda.is_available() else "cpu"
         else:
             return torch.device("cpu")
-
