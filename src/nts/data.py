@@ -17,6 +17,7 @@ def sim(n: int = 10, nT: int = 36):
     for i in range(n):
         ds = torch.arange(0.0, nT)
         X, y = f(ds, torch.tensor([1.0, 0.1, 1.0, 1.0]) * torch.randn(4), torch.rand(1))
+        y = Standardize()(y.numpy())
         dfs.append(pd.DataFrame({"ds": ds, "y": y, "unique_id": i}))
     return pd.concat(dfs)
 
@@ -29,7 +30,7 @@ def split_sequence(sequence, n_steps: int = 20):
         if end_ix > len(sequence) - 1:
             break
         # gather input and output parts of the pattern
-        seq_x, seq_y = sequence[i:end_ix], sequence[end_ix]
+        seq_x, seq_y = sequence.loc[i:end_ix], sequence.loc[end_ix]
         X.append(seq_x)
         y.append(seq_y)
     return np.array(X), y
@@ -39,13 +40,13 @@ class Standardize(object):
     def __init__(self):
         pass
     def __call__(self, y):
-        return (y.to_numpy() - y.mean()) / np.sqrt(y.var())
+        return (y - y.mean()) / np.sqrt(y.var())
 
 
 class TimeSeriesDataset(Dataset):
     """Time series dataset"""
 
-    def __init__(self, n, nT, transform=None, n_steps:int = 20, cutoff: float = 0.5, batch_size: int = 32, device: torch.device = torch.device("cpu")):
+    def __init__(self, n, nT, transform=None, n_steps:int = 20, cutoff: float = 0.5, batch_size: int = 32):
         """
         Arguments:
             n  (int): Number of time series.
@@ -59,7 +60,6 @@ class TimeSeriesDataset(Dataset):
         self.n_steps = n_steps
         self.cutoff = cutoff
         self.batch_size = batch_size
-        self.device = device
 
     def __len__(self):
         return self.n
@@ -82,13 +82,15 @@ class TimeSeriesDataset(Dataset):
         # train samples (return like this so we can create the dataloader later)
         train = [(
             ## add indicator for idx
-            torch.concat((torch.tensor(x), torch.tensor([idx]))).to(self.device), 
-            torch.tensor(y).to(self.device)
+            torch.concat((torch.tensor(x), torch.tensor([idx]))), 
+            torch.tensor([y])
+            #torch.tensor([y]).unsqueeze(0)
         ) for x, y in zip(Xtrain, ytrain)]
         test = [(
             ## add indicator for idx
-            torch.concat((torch.tensor(x), torch.tensor([idx]))).to(self.device), 
-            torch.tensor(y).to(self.device)
+            torch.concat((torch.tensor(x), torch.tensor([idx]))), 
+            torch.tensor([y])
+            #torch.tensor([y]).unsqueeze(0)
         ) for x, y in zip(Xtest, ytest)]
     
         return train, test
