@@ -10,9 +10,7 @@ import mlflow
 import pandas as pd
 import numpy as np
 
-device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
-
-def split_sequence(sequence, n_steps):
+def split_sequence(sequence, n_steps, device):
     X, y = list(), list()
     for i in range(len(sequence)):
         # find the end of this pattern
@@ -58,7 +56,7 @@ class LinearRegressionModel(torch.nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, n_in: int = 2):
+    def __init__(self, n_in, device):
         super().__init__()
         self.layers = nn.Sequential(
             nn.Linear(n_in, 64),
@@ -104,12 +102,12 @@ def test_loop(dataloader, model, loss_fn):
         "test_loss": test_loss, 
     })
 def train(train_dataloader, test_dataloader, params):
-    n_in = params["n_in"]
-    model = MLP(n_in)
+    n_in = params.n_in
+    model = MLP(n_in, params.device)
     loss_fn = torch.nn.MSELoss()
-    #optimizer = torch.optim.Adam(model.parameters(), lr = params["lr"])
-    optimizer = torch.optim.SGD(model.parameters(), lr = params["lr"])
-    for t in range(params["n_epoch"]):
+    #optimizer = torch.optim.Adam(model.parameters(), lr = params.lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr = params.lr)
+    for t in range(params.n_epoch):
         # print(f"Epoch {t+1}\n-------------------------------")
         train_loop(train_dataloader, model, loss_fn, optimizer)
         if t % 100 == 0:
@@ -117,30 +115,28 @@ def train(train_dataloader, test_dataloader, params):
     return model
 
 
-def fit(x_data, y_data, x_test=None, y_test=None, params = {"lr": 1e-3, 
-                                                            "batch_size": 1,
-                                                            "n_epoch": 1000}):
+def fit(x_data, y_data, params, x_test=None, y_test=None):
     n_in = len(x_data[0])
     # our model
     # model = LinearRegressionModel(n_in)
-    model = MLP(n_in)
+    model = MLP(n_in, params.device)
     criterion = torch.nn.MSELoss()
     #optimizer = torch.optim.SGD(model.parameters(), lr = lr)
-    optimizer = torch.optim.Adam(model.parameters(), lr = params["lr"])
+    optimizer = torch.optim.Adam(model.parameters(), lr = params.lr)
     #optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
     training_data = [(x, y) 
         for x,y in zip(x_data, y_data)]
     train_dataloader = DataLoader(training_data,
-                                  batch_size=params["batch_size"], 
+                                  batch_size=params.batch_size, 
                                   shuffle=True)
     # train_features, train_labels = next(iter(train_dataloader))
-    if device.type == 'cuda':
+    if params.device.type == 'cuda':
         print(torch.cuda.get_device_name(0))
         print('Memory Usage:')
         print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,4), 'GB')
         print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,4), 'GB')
     model.train()
-    for epoch in range(params["n_epoch"]):
+    for epoch in range(params.n_epoch):
         for batch_idx, (bx, by) in enumerate(train_dataloader):
             pred_y = model(bx)
             optimizer.zero_grad()
