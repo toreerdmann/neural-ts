@@ -31,7 +31,7 @@ members = [
 ]
 
 [project.scripts]
-main = "nts:main"
+main = "nts.main:main"
 
 [build-system]
 requires = ["hatchling"]

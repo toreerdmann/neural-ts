@@ -97,10 +97,13 @@ def predict(model, data: TimeSeriesDataset, params):
     data_long = data.data.reset_index().melt(value_name="y", id_vars=["ds"])
     data_long["yhat"] = np.nan
     for i in range(len(data)):
-        # yfitted = [model(x.to(params.device)) for (x,y) in data[i][0]]
+        yfit  = [model(x.to(params.device)) for (x, y) in data[i][0]]
         ypred = [model(x.to(params.device)) for (x, y) in data[i][1]]
+        yfit  = torch.concat(yfit).cpu().detach().numpy().flatten()
         ypred = torch.concat(ypred).cpu().detach().numpy().flatten()
         subset_indices = data_long.index[data_long["unique_id"] == i]
+        indices_to_modify = subset_indices[data.n_steps:int(data.nT * data.cutoff)]
+        data_long.loc[indices_to_modify, "yhat"] = yfit
         indices_to_modify = subset_indices[int(data.nT * data.cutoff) :]
         data_long.loc[indices_to_modify, "yhat"] = ypred
     return data_long

@@ -7,7 +7,6 @@ class Parameters(BaseSettings):
     model_config = SettingsConfigDict()
     n: int = 10
     nT: int = 200
-    histlen: int = 12
     cutoff: int = 100
     n_epoch: int = 2 * 1000
     batch_size: int = 128
