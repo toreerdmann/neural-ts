@@ -1,9 +1,9 @@
 
-# Neural networks for time series
+# Neural time series forecasting
 
 Things to try:
 
 * [ ] underlying HMM (different states of time series)
-  * [ ] effects of dead time series on trainin of the rest
+  * [ ] effects of dead time series on training of the rest
 * [ ] probabilistic outputs
 * [ ] recurrent networks / cnns / transformers
