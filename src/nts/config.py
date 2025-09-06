@@ -11,12 +11,12 @@ class Parameters(BaseSettings):
     n_epoch: int = 2 * 1000
     batch_size: int = 128
     lr: float = 1e-3
-    device: torch.device = "cuda"
+    device: torch.device = torch.device("cuda")
 
     @field_validator("device", mode="before")
     @classmethod
-    def val_dev(cls, value: str) -> torch.device:
-        if value == "cuda":
-            return torch.device("cuda") if torch.cuda.is_available() else "cpu"
+    def val_dev(cls, value: torch.device) -> torch.device:
+        if value.type == "cuda":
+            return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         else:
             return torch.device("cpu")

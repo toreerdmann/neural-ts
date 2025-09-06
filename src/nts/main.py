@@ -1,13 +1,24 @@
 import mlflow
 import torch
+import requests
 
 from nts.config import Parameters
 from nts.data import Standardize, TimeSeriesDataset
 from nts.utils import make_plots, predict, train
 
+MLFLOW_URI = "http://localhost:8080"
 
 def main():
-    mlflow.set_tracking_uri(uri="http://localhost:8080")
+
+    try:
+        # Check if server is running
+        endpoint = "/api/2.0/mlflow/experiments/list"
+        response = requests.get(f"{MLFLOW_URI}{endpoint}")
+        mlflow.set_tracking_uri(uri=MLFLOW_URI)
+    except requests.exceptions.ConnectionError:
+        print("need to start mlflow server")
+        exit()
+
     params = Parameters()
     print(params)
     torch.manual_seed(123)
